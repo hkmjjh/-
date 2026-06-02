@@ -1,0 +1,1296 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>기록 수사대: 레벨업! (카카오 연동판)</title>
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Google Fonts: Inter & Noto Sans KR -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700;800&family=Noto+Sans+KR:wght@300;400;500;700;900&display=swap" rel="stylesheet">
+    <!-- FontAwesome for Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- Kakao SDK -->
+    <script src="https://t1.kakaocdn.net/kakao_js_sdk/2.7.2/kakao.min.js" crossorigin="anonymous"></script>
+    <style>
+        body {
+            font-family: 'Noto Sans KR', 'Inter', sans-serif;
+            background-color: #0b0f19;
+            color: #f1f5f9;
+            overflow-x: hidden;
+        }
+        /* Custom Scrollbar */
+        ::-webkit-scrollbar {
+            width: 8px;
+        }
+        ::-webkit-scrollbar-track {
+            background: #0f172a;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #334155;
+            border-radius: 4px;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: #475569;
+        }
+        /* Pulse Animation for Patient Monitor */
+        @keyframes pulse-fast {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.3; }
+        }
+        .pulse-text {
+            animation: pulse-fast 1.2s infinite;
+        }
+        /* Shake effect on error */
+        @keyframes shake {
+            0%, 100% { transform: translateX(0); }
+            10%, 30%, 50%, 70%, 90% { transform: translateX(-6px); }
+            20%, 40%, 60%, 80% { transform: translateX(6px); }
+        }
+        .shake-effect {
+            animation: shake 0.4s ease-in-out;
+        }
+    </style>
+</head>
+<body class="min-h-screen flex flex-col justify-between selection:bg-indigo-500 selection:text-white">
+
+    <!-- TOP NAVIGATION BAR -->
+    <header class="border-b border-slate-800 bg-slate-900/90 backdrop-blur-md sticky top-0 z-40 px-4 py-3">
+        <div class="max-w-7xl mx-auto flex justify-between items-center">
+            <div class="flex items-center space-x-3">
+                <div class="bg-gradient-to-tr from-indigo-600 to-violet-600 p-2.5 rounded-xl text-white shadow-lg shadow-indigo-500/20">
+                    <i class="fa-solid fa-user-shield fa-lg"></i>
+                </div>
+                <div>
+                    <h1 class="text-md md:text-lg font-extrabold tracking-wider text-transparent bg-clip-text bg-gradient-to-r from-indigo-400 via-purple-400 to-cyan-400">
+                        기록 수사대: 레벨업!
+                    </h1>
+                    <p class="text-[10px] md:text-xs text-slate-400">의사 의무기록 적정성 평가 대비 RPG</p>
+                </div>
+            </div>
+            
+            <!-- Character Status Badges & Setting Button -->
+            <div class="flex items-center space-x-2 md:space-x-3">
+                <div class="hidden md:flex flex-col items-end">
+                    <span class="text-[10px] text-slate-400">기록 의사 자격 등급</span>
+                    <span id="char-rank-badge" class="text-xs font-bold text-yellow-400">🕵️‍♂️ 수습 수사관</span>
+                </div>
+                <div class="bg-slate-950 border border-slate-850 px-3 py-1.5 rounded-lg flex items-center space-x-2">
+                    <span class="text-[10px] text-indigo-400 font-extrabold tracking-wider">SCORE</span>
+                    <span id="total-score" class="font-mono text-white font-black text-sm">0</span>
+                </div>
+                <!-- Kakao Config Cog -->
+                <button onclick="toggleKakaoSettings()" class="bg-slate-800 hover:bg-slate-700 text-slate-300 p-2 rounded-lg transition-all" title="카카오 앱 키 설정">
+                    <i class="fa-solid fa-gear"></i>
+                </button>
+            </div>
+        </div>
+    </header>
+
+    <!-- MAIN CONTAINER -->
+    <main class="flex-grow flex items-center justify-center p-4">
+        <div id="game-container" class="w-full max-w-7xl bg-slate-900/40 border border-slate-800/80 rounded-2xl shadow-2xl overflow-hidden backdrop-blur-md">
+            
+            <!-- START / INTRO SCREEN -->
+            <div id="view-intro" class="p-6 md:p-12 text-center max-w-3xl mx-auto">
+                <div class="inline-block bg-indigo-500/10 text-indigo-300 border border-indigo-500/20 px-3.5 py-1 rounded-full text-xs font-semibold uppercase tracking-wider mb-5">
+                     CLINICAL RECORD AUDIT TRAINING RPG
+                </div>
+
+                <!-- Kakao Challengers Banner -->
+                <div id="challenger-banner" class="hidden bg-gradient-to-r from-amber-500/20 to-orange-500/20 border border-amber-500/30 p-4 rounded-xl text-left mb-6 flex items-center space-x-3 animate-pulse">
+                     <span class="text-3xl">🔥</span>
+                     <div class="flex-1">
+                         <p class="text-[10px] text-amber-400 font-black uppercase tracking-wider">기록 수사대 도전장 도착!</p>
+                         <p class="text-sm text-white font-semibold" id="challenger-text">
+                             <span class="text-yellow-400 font-extrabold" id="challenger-name">홍의사</span> 님이 보낸 도전장! 
+                             (점수: <span id="challenger-score" class="font-mono text-cyan-400 font-bold">1200</span> XP | 등급: <span id="challenger-rank" class="text-yellow-400 font-bold">기록 마스터</span>)
+                         </p>
+                         <p class="text-[11px] text-slate-400 mt-1">이 도전을 뛰어넘어, 환자의 안전 게이지를 완벽하게 수호해 보세요!</p>
+                     </div>
+                </div>
+
+                <h2 class="text-3xl md:text-5xl font-black mb-6 tracking-tight leading-tight text-white">
+                    부실한 임상기록을 경정하고<br>
+                    <span class="text-transparent bg-clip-text bg-gradient-to-r from-emerald-400 to-cyan-400">환자의 안전을 수호하라!</span>
+                </h2>
+                <p class="text-slate-300 text-sm md:text-base mb-8 leading-relaxed max-w-2xl mx-auto">
+                    당신은 병원 의무기록 적정성 평가를 통과해야 하는 신임 임상의사(PA/수련의)입니다. 
+                    부적절한 기록, 반복 복사된 기록, 모호한 형용사는 의료 소통 오류를 발생시켜 환자를 치명적인 위험에 빠뜨립니다. 
+                    체크리스트 기준에 맞게 경과기록을 수사 및 정정하여 환자를 치유하고 '기록 마스터' 등급을 획득하십시오!
+                </p>
+
+                <!-- Doctor Character Selection & Name Setup -->
+                <div class="bg-slate-900/80 border border-slate-800 p-6 rounded-xl mb-8 text-left max-w-xl mx-auto shadow-inner">
+                    <label class="block text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">수사대원 의사 성함 등록</label>
+                    <input type="text" id="player-name-input" value="한의사" class="w-full bg-slate-950 border border-slate-800 rounded-lg px-4 py-3 text-white placeholder-slate-600 focus:outline-none focus:border-indigo-500 transition-colors mb-5" placeholder="성함을 입력하세요">
+                    
+                    <span class="block text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">원내 프로필 이미지 선택</span>
+                    <div class="grid grid-cols-2 gap-4">
+                        <button onclick="selectAvatar('f')" id="btn-avatar-f" class="flex items-center space-x-3 bg-slate-950 border-2 border-indigo-500 p-3 rounded-lg hover:bg-slate-900 transition text-left">
+                            <span class="text-3xl">👩‍⚕️</span>
+                            <div>
+                                <div class="font-bold text-sm text-white">이혜진 전공의</div>
+                                <div class="text-xs text-indigo-400">내과 수사팀 F</div>
+                            </div>
+                        </button>
+                        <button onclick="selectAvatar('m')" id="btn-avatar-m" class="flex items-center space-x-3 bg-slate-950 border-2 border-transparent p-3 rounded-lg hover:bg-slate-900 transition text-left">
+                            <span class="text-3xl">👨‍⚕️</span>
+                            <div>
+                                <div class="font-bold text-sm text-slate-400">박하늘 전공의</div>
+                                <div class="text-xs text-slate-500">외과 수사팀 M</div>
+                            </div>
+                        </button>
+                    </div>
+                </div>
+
+                <button onclick="startGame()" class="w-full md:w-auto bg-gradient-to-r from-indigo-500 via-purple-500 to-pink-500 hover:from-indigo-600 hover:to-pink-600 text-white font-bold px-12 py-4 rounded-xl shadow-xl shadow-indigo-500/20 transform hover:-translate-y-0.5 transition active:translate-y-0 text-lg">
+                    수사 개시하기 <i class="fa-solid fa-shield-halved ml-2"></i>
+                </button>
+            </div>
+
+            <!-- GAMEPLAY SCREEN (STAGE WORKSPACE) -->
+            <div id="view-gameplay" class="hidden grid grid-cols-1 lg:grid-cols-12 divide-y lg:divide-y-0 lg:divide-x divide-slate-800">
+                
+                <!-- Left Sidebar (Patient & Investigator Status) - 4 Columns -->
+                <div class="lg:col-span-4 p-5 flex flex-col justify-between bg-slate-950/60">
+                    
+                    <!-- Patient Vital Card -->
+                    <div>
+                        <div class="flex items-center justify-between mb-3">
+                            <span class="text-xs font-bold text-indigo-400 uppercase tracking-wider">진단 대상 환자 프로필</span>
+                            <span id="danger-badge" class="flex items-center space-x-1.5 text-rose-500 bg-rose-500/10 border border-rose-500/20 px-2 py-0.5 rounded-full text-[10px] font-bold">
+                                <span class="h-1.5 w-1.5 rounded-full bg-rose-500 animate-pulse"></span>
+                                <span>정리 오류 누적 경보</span>
+                            </span>
+                        </div>
+                        
+                        <!-- Dynamic Patient Health Monitor Card -->
+                        <div class="bg-slate-900 border border-slate-800 rounded-xl p-4 shadow-inner relative overflow-hidden">
+                            <div class="absolute inset-0 opacity-5 pointer-events-none bg-[radial-gradient(#38bdf8_1px,transparent_1px)] [background-size:16px_16px]"></div>
+                            
+                            <div class="flex items-center space-x-3 mb-3">
+                                <div class="text-4xl" id="patient-icon">🤒</div>
+                                <div>
+                                    <h3 id="patient-name" class="font-bold text-white text-base">한환자 (남/45세)</h3>
+                                    <p id="patient-diagnosis" class="text-xs text-slate-400">상세불명의 급성 복통 (Acute Abdomen)</p>
+                                </div>
+                            </div>
+
+                            <!-- Vital Sign ECG Simulation -->
+                            <div class="h-12 w-full bg-slate-950 rounded-lg border border-slate-800 flex items-center justify-center p-2 mb-3 relative overflow-hidden">
+                                <svg class="w-full h-full" viewBox="0 0 300 40" preserveAspectRatio="none">
+                                    <path id="ecg-line" d="M0,20 L50,20 L60,10 L70,30 L80,20 L150,20 L160,10 L170,30 L180,20 L250,20 L260,10 L270,30 L280,20 L300,20" 
+                                          fill="none" stroke="#10b981" stroke-width="2" class="transition-all duration-300"></path>
+                                </svg>
+                                <div class="absolute right-2 top-1 text-[9px] font-mono text-emerald-500" id="vitals-display">HR 72 | BT 36.8℃</div>
+                            </div>
+
+                            <!-- Health Bar (Patient HP) -->
+                            <div>
+                                <div class="flex justify-between items-center mb-1 text-xs">
+                                    <span class="text-slate-400 font-semibold">환자의 안전도 게이지 (HP)</span>
+                                    <span id="patient-hp-text" class="font-mono font-bold text-emerald-400">100 / 100</span>
+                                </div>
+                                <div class="w-full bg-slate-950 h-3 rounded-full overflow-hidden border border-slate-800">
+                                    <div id="patient-hp-bar" class="bg-gradient-to-r from-emerald-500 to-teal-400 h-full w-full transition-all duration-500 rounded-full"></div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Real-time Interactive Checklist Panel -->
+                    <div class="my-4 flex-grow">
+                        <div class="flex justify-between items-center mb-2">
+                            <span class="text-xs font-bold text-indigo-300 flex items-center space-x-1">
+                                <i class="fa-solid fa-clipboard-list"></i>
+                                <span>의무기록 적정성 평가 항목</span>
+                            </span>
+                            <button onclick="toggleReference()" class="text-[10px] text-indigo-400 hover:text-indigo-300 transition underline">체크리스트 전문 보기</button>
+                        </div>
+                        <div class="bg-slate-900/60 border border-slate-800/80 rounded-xl p-3 text-xs space-y-2.5 max-h-56 overflow-y-auto">
+                            <div class="flex items-start space-x-2">
+                                <i class="fa-regular fa-square-check text-indigo-500 mt-0.5"></i>
+                                <p class="text-[11px] text-slate-300"><span class="text-indigo-300 font-bold">충실도:</span> 작성시점(일시), 등록번호, S/O/A/P 구분, 반복기록 회피, 금기약어 배제 필수</p>
+                            </div>
+                            <div class="flex items-start space-x-2">
+                                <i class="fa-regular fa-square-check text-indigo-500 mt-0.5"></i>
+                                <p class="text-[11px] text-slate-300"><span class="text-indigo-300 font-bold">주관적(S):</span> 환자/보호자 호소 필수 기록. <span class="text-amber-400 font-bold">★NRS 통증 강도는 주관적(S)에 수록</span></p>
+                            </div>
+                            <div class="flex items-start space-x-2">
+                                <i class="fa-regular fa-square-check text-indigo-500 mt-0.5"></i>
+                                <p class="text-[11px] text-slate-300"><span class="text-indigo-300 font-bold">객관적(O):</span> '조금', '약간' 등 모호한 단어 및 '~보임', '~같음' 근거 없는 추측 배제, 수치화 기재</p>
+                            </div>
+                            <div class="flex items-start space-x-2">
+                                <i class="fa-regular fa-square-check text-indigo-500 mt-0.5"></i>
+                                <p class="text-[11px] text-slate-300"><span class="text-indigo-300 font-bold">안전기록:</span> 라인 이탈, 약물중단/변경 시 조치 내용과 환자 설명 필수 (※작성자가 의사이므로 의사 보고는 제외)</p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Detective Inventory & Skills -->
+                    <div>
+                        <h4 class="text-[11px] font-bold text-slate-400 uppercase tracking-wider mb-2 flex items-center justify-between">
+                            <span>수사팀 특화 스킬 및 장비</span>
+                            <span class="text-[9px] text-slate-500 normal-case">미션당 1회씩만 작동 가능</span>
+                        </h4>
+                        <div class="grid grid-cols-2 gap-3">
+                            <!-- Item 1: 표준 용어 사전 -->
+                            <button onclick="useItem('dictionary')" id="item-dictionary" class="flex flex-col items-center bg-slate-900 border border-slate-800 hover:border-indigo-500/60 p-2.5 rounded-xl text-center group transition active:scale-95">
+                                <span class="text-2xl group-hover:scale-110 transition-transform mb-1">📕</span>
+                                <span class="text-xs font-bold text-white block">표준 용어 사전</span>
+                                <span class="text-[9px] text-slate-400 mt-0.5">금기약어 자동교정</span>
+                                <span id="item-dict-badge" class="mt-1.5 px-2 py-0.5 bg-indigo-500/20 border border-indigo-500/30 text-[9px] text-indigo-400 rounded-full">사용가능</span>
+                            </button>
+                            
+                            <!-- Item 2: 24시간 적시성 시계 -->
+                            <button onclick="useItem('timer')" id="item-timer" class="flex flex-col items-center bg-slate-900 border border-slate-800 hover:border-indigo-500/60 p-2.5 rounded-xl text-center group transition active:scale-95">
+                                <span class="text-2xl group-hover:scale-110 transition-transform mb-1">⏱️</span>
+                                <span class="text-xs font-bold text-white block">24h 적시 타이머</span>
+                                <span class="text-[9px] text-slate-400 mt-0.5">적시성/설명의무 힌트</span>
+                                <span id="item-timer-badge" class="mt-1.5 px-2 py-0.5 bg-indigo-500/20 border border-indigo-500/30 text-[9px] text-indigo-400 rounded-full">사용가능</span>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Right Workspace (Active stage and missions) - 8 Columns -->
+                <div class="lg:col-span-8 p-6 flex flex-col justify-between min-h-[550px]">
+                    <!-- Current Stage Indicator Header -->
+                    <div class="flex items-center justify-between border-b border-slate-800 pb-4 mb-4">
+                        <div>
+                            <span id="stage-number" class="text-xs font-bold text-indigo-400 tracking-widest uppercase">STAGE 01</span>
+                            <h3 id="stage-title" class="text-lg md:text-xl font-bold text-white mt-0.5">SOAP 구조와 충실도 수사</h3>
+                        </div>
+                        <div class="flex items-center space-x-2">
+                            <span class="text-xs text-slate-400">진행도:</span>
+                            <span id="stage-progress" class="font-mono text-sm font-bold text-cyan-400">1 / 3</span>
+                        </div>
+                    </div>
+
+                    <!-- Active Mission Container -->
+                    <div class="flex-grow flex flex-col justify-center" id="mission-workspace">
+                        <!-- Dynamic Mission Content injected here -->
+                    </div>
+
+                    <!-- Warning Toast/Feedback Box inside editor -->
+                    <div id="feedback-alert" class="hidden mt-4 p-4 rounded-xl border flex items-center space-x-3 transition-all duration-300">
+                        <span id="feedback-icon" class="text-xl"></span>
+                        <div class="flex-1">
+                            <p id="feedback-message" class="text-xs md:text-sm font-semibold leading-relaxed"></p>
+                        </div>
+                    </div>
+
+                    <!-- Bottom Navigation/Control buttons -->
+                    <div class="border-t border-slate-800 pt-4 mt-4 flex items-center justify-between">
+                        <button onclick="triggerQuitConfirm()" class="text-xs text-slate-500 hover:text-rose-400 transition flex items-center space-x-1.5">
+                            <i class="fa-solid fa-arrow-right-from-bracket"></i>
+                            <span>수사 대기실로 퇴각</span>
+                        </button>
+                        
+                        <div class="flex space-x-2">
+                            <button id="btn-next-mission" onclick="submitAnswer()" class="bg-indigo-600 hover:bg-indigo-500 text-white font-bold px-7 py-3 rounded-xl text-sm transition shadow-lg shadow-indigo-600/20 hover:shadow-indigo-600/30 flex items-center space-x-1.5">
+                                <span>정리 기록 판정 제출</span>
+                                <i class="fa-solid fa-scale-balanced"></i>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- STAGE CLEAR / LEVEL UP MODAL SCREEN -->
+            <div id="view-stage-clear" class="hidden p-8 text-center max-w-lg mx-auto py-12 animate-fade-in">
+                <div class="w-20 h-20 bg-emerald-500/10 border border-emerald-500/30 rounded-full flex items-center justify-center mx-auto mb-6 text-4xl animate-bounce">
+                    🏆
+                </div>
+                <h3 class="text-2xl font-black text-white mb-2" id="clear-title">STAGE CLEAR!</h3>
+                <p class="text-sm text-slate-400 mb-6" id="clear-desc">훌륭합니다! 환자의 경과기록을 성공적으로 바로잡아 유의미한 회복이 나타나기 시작했습니다.</p>
+                
+                <div class="bg-slate-900/80 rounded-xl p-4 border border-slate-800 text-left space-y-3 mb-6">
+                    <div class="flex justify-between items-center">
+                        <span class="text-xs text-slate-400">누적 획득 점수</span>
+                        <span class="text-sm font-mono font-bold text-cyan-400" id="clear-score">+100 XP</span>
+                    </div>
+                    <div class="flex justify-between items-center">
+                        <span class="text-xs text-slate-400">현재 수사관 지위</span>
+                        <span class="text-sm font-bold text-yellow-400" id="clear-rank">🕵️‍♂️ 수습 수사관</span>
+                    </div>
+                    <div class="flex justify-between items-center">
+                        <span class="text-xs text-slate-400">환자 생명력 회복</span>
+                        <span class="text-sm font-bold text-emerald-400">안전도 게이지 100% 리셋</span>
+                    </div>
+                </div>
+
+                <button onclick="goToNextStage()" id="btn-next-stage" class="w-full bg-gradient-to-r from-indigo-600 to-indigo-500 hover:from-indigo-500 hover:to-indigo-400 text-white font-bold py-3.5 px-6 rounded-xl text-sm transition shadow-lg shadow-indigo-600/20">
+                    다음 수사(스테이지)로 가기 <i class="fa-solid fa-arrow-right ml-1"></i>
+                </button>
+            </div>
+
+            <!-- GAME OVER / REHABILITATION SCREEN -->
+            <div id="view-game-over" class="hidden p-8 text-center max-w-lg mx-auto py-12">
+                <div class="w-20 h-20 bg-rose-500/10 border border-rose-500/30 rounded-full flex items-center justify-center mx-auto mb-6 text-4xl">
+                    🚨
+                </div>
+                <h3 class="text-2xl font-black text-rose-500 mb-2">기록 오류로 인한 의료 질 하락!</h3>
+                <p class="text-sm text-slate-400 mb-6 leading-relaxed">
+                    적정성 평가 기준에 위배되는 부실 기록, 금기 약어, 모호한 표현의 누적으로 의료 소통 오류가 심화되어 환자 안전도 수치가 바닥났습니다.
+                </p>
+
+                <div class="bg-rose-950/20 border border-rose-900/40 rounded-xl p-4 text-left text-xs text-slate-300 space-y-2 mb-6">
+                    <p class="font-bold text-rose-400"><i class="fa-solid fa-triangle-exclamation mr-1"></i> 주요 수사 오답 리포트:</p>
+                    <ul class="list-disc pl-5 space-y-1.5 text-[11px] text-slate-400">
+                        <li><span class="text-amber-400 font-bold">NRS 통증지수</span>는 주관적 자료(S)의 주관적 진술 영역에 기입해야 합니다.</li>
+                        <li>주관적 서술(S)을 뺀 O, A, P에서는 <span class="text-rose-400">"경하게", "조금", "~같음", "~보임"</span> 등 불확실한 단어 사용 시 감점 처리됩니다.</li>
+                        <li>의사 본인이 직접 적는 의무기록이므로 <span class="text-rose-400">"의사 보고/노티"</span>를 기록할 필요가 없고, 본인의 직접 조치 및 설명을 적습니다.</li>
+                        <li>이전 기록을 그대로 복사해 반복 기입(Ctrl+C, V)하는 루틴 기록은 불충실 기록에 해당합니다.</li>
+                    </ul>
+                </div>
+
+                <button onclick="restartStage()" class="w-full bg-slate-800 hover:bg-slate-700 text-white font-bold py-3 px-6 rounded-xl text-sm transition border border-slate-700 mb-2">
+                    이번 스테이지 재도전하기 <i class="fa-solid fa-rotate-left ml-1"></i>
+                </button>
+                <button onclick="returnToMain()" class="w-full text-slate-500 hover:text-slate-400 text-xs py-2 transition">
+                    수사본부 메인 대기실로 탈출
+                </button>
+            </div>
+
+            <!-- FINAL GAME CLEAR / ENDING STORY SCREEN -->
+            <div id="view-ending" class="hidden p-6 md:p-12 text-center max-w-4xl mx-auto">
+                <div class="w-24 h-24 bg-gradient-to-tr from-amber-400 via-yellow-500 to-orange-500 rounded-full flex items-center justify-center mx-auto mb-8 shadow-lg shadow-amber-500/20 text-5xl">
+                    👑
+                </div>
+                <span class="bg-amber-500/10 text-amber-400 border border-amber-500/20 px-3.5 py-1 rounded-full text-xs font-semibold uppercase tracking-wider mb-4 inline-block">
+                    PRO AUDIT COMPLETION
+                </span>
+                <h2 class="text-3xl md:text-5xl font-black mb-4 tracking-tight text-white">
+                    기록 수사 마스터 <span class="text-amber-400" id="ending-player-name">한의사</span> 의사님!<br>
+                    <span class="text-transparent bg-clip-text bg-gradient-to-r from-yellow-300 via-amber-400 to-amber-600">의무기록 적정성 100점 달성 완료!</span>
+                </h2>
+                <p class="text-slate-300 text-sm md:text-base mb-8 max-w-2xl mx-auto leading-relaxed">
+                    당신의 명확하고 신속하며 규정에 부합하는 철저한 기록 습관 덕분에 원내 소통 오류가 완전 종식되었으며, 병원 인증 평가에서 우수 사례로 등극하게 되었습니다.
+                </p>
+
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
+                    <div class="bg-slate-900/80 p-4 rounded-xl border border-slate-800 text-center">
+                        <span class="text-xs text-slate-400 block mb-1">최종 등급</span>
+                        <span class="text-md font-bold text-amber-400"><i class="fa-solid fa-award mr-1"></i> 기록 수사 마스터</span>
+                    </div>
+                    <div class="bg-slate-900/80 p-4 rounded-xl border border-slate-800 text-center">
+                        <span class="text-xs text-slate-400 block mb-1">최종 수사력</span>
+                        <span class="text-md font-mono font-bold text-white" id="ending-score">1,200 XP</span>
+                    </div>
+                    <div class="bg-slate-900/80 p-4 rounded-xl border border-slate-800 text-center">
+                        <span class="text-xs text-slate-400 block mb-1">진료기록 적정 수준</span>
+                        <span class="text-md font-bold text-emerald-400"><i class="fa-solid fa-check-double mr-1"></i> 1등급 의사 (100%)</span>
+                    </div>
+                </div>
+
+                <!-- KakaoTalk Share Actions & Dynamic Trigger Buttons -->
+                <div class="flex flex-col sm:flex-row justify-center gap-3 mb-8">
+                    <button onclick="shareOnKakaoTalk()" class="flex-1 bg-[#FEE500] hover:bg-[#FEE500]/90 text-[#191919] font-black px-6 py-4 rounded-xl text-sm transition shadow-xl shadow-yellow-500/10 flex items-center justify-center space-x-2">
+                        <i class="fa-solid fa-comment text-lg"></i>
+                        <span>카카오톡으로 도전장 공유하기</span>
+                    </button>
+                    <button onclick="copyChallengeLink()" class="flex-1 bg-slate-800 hover:bg-slate-700 text-slate-200 font-bold px-6 py-4 rounded-xl text-sm transition border border-slate-700 flex items-center justify-center space-x-2">
+                        <i class="fa-solid fa-link"></i>
+                        <span>도전장 링크 클립보드 복사</span>
+                    </button>
+                </div>
+
+                <!-- PA Recording Cheat Sheet for User to export/review -->
+                <div class="bg-slate-950 border border-slate-850 rounded-xl p-5 text-left mb-8 max-h-72 overflow-y-auto shadow-inner">
+                    <div class="flex justify-between items-center mb-3">
+                        <span class="text-sm font-bold text-indigo-400 flex items-center space-x-1.5">
+                            <i class="fa-solid fa-clipboard-check"></i>
+                            <span>의사 경과기록지 적정성 평가 대비 요약본</span>
+                        </span>
+                        <button onclick="copyCheatSheet()" class="text-xs bg-slate-900 hover:bg-indigo-600 text-slate-300 hover:text-white px-2.5 py-1 rounded transition flex items-center space-x-1 border border-slate-800">
+                            <i class="fa-regular fa-copy"></i> <span>클립보드 복사</span>
+                        </button>
+                    </div>
+                    <pre id="cheat-sheet-content" class="text-slate-300 text-[11px] leading-relaxed whitespace-pre-wrap font-mono">
+[의사 입원경과기록지(Progress Note) 핵심 체크리스트 요약본]
+
+1. 기본 충실도 원칙
+ - 작성 일시(년-월-일 및 시:분)를 분 단위까지 확실히 기재한다.
+ - 환자 식별정보(이름/등록번호)가 누락되지 않도록 확인한다.
+ - 루틴 경과 기록은 S/O/A/P 구조를 완벽히 격리 기재한다.
+ - 이전 기록을 무수정 반복하여 똑같이 입력하는 복사 행위를 절대 금한다.
+ - 본원 금기 약어(U, IU, QD, QOD 등) 및 중단 시 'D/C' 등의 약어는 전면 배제하고 풀어서 적는다.
+
+2. 주관적 자료 (S) 작성 표준
+ - 통증 평가 척도(NRS 등)는 반드시 주관적 자료(S) 하위에 수록한다 (★중요).
+ - 증상 호소 시 발생 시점, 위치, 양상, 지속시간 중 최소 2가지 이상을 기록한다.
+ - 증상이 없는 날도 "현재 특이 주관적 증상 없음"을 정확히 기술해야 한다.
+
+3. 객관적 자료 (O) 작성 표준
+ - '조금', '약간', '경하게' 등의 모호한 양적 수식어를 철저히 금지한다.
+ - '~것 같음', '~보임' 등 근거 없는 해석(추정)은 O에 넣지 않고 측정 수치나 관찰된 순수 사실만 적는다.
+ - 비정상 활력징후(V/S)나 주요 검사소견 일탈 시, 이에 대한 처방이나 처치 등 대처 사항을 연계 기록한다.
+
+4. 평가 (A) 및 계획 (P)
+ - 현재 환자의 액티브 문제(Problem List)를 1개 이상 명문화한다.
+ - 환자의 주관적(S)/객관적(O) 수치와 매칭되는 명확한 진단명이나 의심 질환을 작성한다.
+ - f/u 계획, 퇴원일의 경우 퇴원형태(퇴원, 전원, 자의퇴원, 사망 등)를 명시한다.
+
+5. 안전 및 책임 기록 (의사 보고 제외)
+ - 작성 주체가 의사이므로 "의사 보고"는 기록에 작성하지 않는다. (본인의 오더 변경 및 조치만을 작성)
+ - 약물의 중단/변경/이상반응 시 약물명과 조치 결과를 즉시 기록한다. (금기어 'D/C' 대신 '중단'으로 명확히 한글 표기)
+ - 낙상, 튜브/라인 일탈(도뇨관, L-tube 등) 등 문제 발생 시의 조치 내용(재삽입 시 출혈 등 부작용 대처 포함)과 환자/보호자 교육/설명 내용을 서식에 상관없이 서술 기록한다.
+                    </pre>
+                </div>
+
+                <div class="flex flex-col sm:flex-row justify-center gap-4">
+                    <button onclick="returnToMain()" class="bg-indigo-600 hover:bg-indigo-500 text-white font-bold px-8 py-3.5 rounded-xl text-sm transition">
+                        처음 화면으로 돌아가기
+                    </button>
+                </div>
+            </div>
+
+        </div>
+    </main>
+
+    <!-- CUSTOM MODAL: REFERNECE CHECKLIST DIALOG -->
+    <div id="modal-reference" class="hidden fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4 backdrop-blur-sm">
+        <div class="bg-slate-900 border border-slate-800 rounded-2xl w-full max-w-2xl max-h-[85vh] overflow-y-auto shadow-2xl">
+            <div class="p-5 border-b border-slate-800 flex justify-between items-center bg-slate-950">
+                <h3 class="text-base font-extrabold text-white flex items-center space-x-2">
+                    <i class="fa-solid fa-book-medical text-indigo-500"></i>
+                    <span>의사 의무기록 적정성 평가 기준표</span>
+                </h3>
+                <button onclick="toggleReference()" class="text-slate-400 hover:text-white transition text-lg"><i class="fa-solid fa-xmark"></i></button>
+            </div>
+            <div class="p-6 space-y-4 text-xs leading-relaxed text-slate-300">
+                <div>
+                    <h4 class="font-bold text-indigo-400 mb-1 border-b border-slate-800 pb-1">1. 충실도 기준</h4>
+                    <ul class="list-disc pl-5 space-y-1">
+                        <li>정확한 기록 시점(일시), 등록번호, 환자식별 확실성 검증</li>
+                        <li>이전 기록 무수정 반복 및 똑같은 복제(Copy/Paste) 복사 금지</li>
+                        <li>본원 금기 약어(U, IU, QD, QOD 등) 사용 금지, 정식 표준 용어 작성</li>
+                    </ul>
+                </div>
+                <div>
+                    <h4 class="font-bold text-indigo-400 mb-1 border-b border-slate-800 pb-1">2. 주관적 자료(S) 기준</h4>
+                    <ul class="list-disc pl-5 space-y-1">
+                        <li>환자의 증상 발생 시점, 양상, 위치, 지속시간 중 최소 2가지 이상 기재</li>
+                        <li><span class="text-yellow-400 font-bold">★통증 수치(NRS 등)는 객관적 지표가 아닌 환자의 주관적 표명(S)으로 귀속 작성</span></li>
+                        <li>증상이 없을 때도 관련 증상 무(특이 증상 없음)를 기록</li>
+                    </ul>
+                </div>
+                <div>
+                    <h4 class="font-bold text-indigo-400 mb-1 border-b border-slate-800 pb-1">3. 객관적 자료(O) 기준</h4>
+                    <ul class="list-disc pl-5 space-y-1">
+                        <li>활력징후 이상에 대한 의사 평가 또는 처방 및 처치 행위 기록 연동</li>
+                        <li>O 영역 기재 시 '경하게, 조금, 약간, ~것 같음, ~보임' 등 추정 단어 금지</li>
+                        <li>명확한 신체검진 결과 수치, 배설량 수치(cc), 실제 검사 수치 연동</li>
+                    </ul>
+                </div>
+                <div>
+                    <h4 class="font-bold text-indigo-400 mb-1 border-b border-slate-800 pb-1">4. 평가(A) & 계획(P) 기준</h4>
+                    <ul class="list-disc pl-5 space-y-1">
+                        <li>S/O 자료와 연동되는 진단명 또는 의심 질환 목록 수록</li>
+                        <li>문제 리스트 1개 이상과 세부 f/u 추적 계획 수립</li>
+                        <li>퇴원 당일 경과기록에 퇴원형태(퇴원, 전원, 자의퇴원, 사망 등) 명시</li>
+                    </ul>
+                </div>
+                <div>
+                    <h4 class="font-bold text-indigo-400 mb-1 border-b border-slate-800 pb-1">5. 안전 & 책임기록</h4>
+                    <ul class="list-disc pl-5 space-y-1">
+                        <li>의사가 직접 조치하므로 "의사 보고"는 불필요. 대신 본인의 처치 및 약물 조절 기록</li>
+                        <li>튜브(배액관, 도뇨관 등) 이탈 및 낙상 사고 등 중요 사건 조치와 환자/보호자 설명 의무 기록</li>
+                    </ul>
+                </div>
+            </div>
+            <div class="p-4 bg-slate-950 border-t border-slate-800 text-right">
+                <button onclick="toggleReference()" class="bg-indigo-600 hover:bg-indigo-500 text-white font-bold px-5 py-2 rounded-lg text-xs transition">
+                    확인 및 닫기
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- CUSTOM QUIT CONFIRM MODAL -->
+    <div id="modal-quit" class="hidden fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-4 backdrop-blur-sm animate-fade-in">
+        <div class="bg-slate-900 border border-slate-800 rounded-2xl w-full max-w-sm overflow-hidden shadow-2xl">
+            <div class="p-6 text-center">
+                <div class="w-12 h-12 bg-rose-500/10 border border-rose-500/20 text-rose-500 rounded-full flex items-center justify-center mx-auto mb-4 text-xl">
+                    <i class="fa-solid fa-triangle-exclamation"></i>
+                </div>
+                <h4 class="text-md font-bold text-white mb-2">수사를 포기하시겠습니까?</h4>
+                <p class="text-xs text-slate-400 leading-relaxed">
+                    지금 퇴각하시면 현재 스테이지의 진행 상황 및 획득하신 누적 점수 일부가 소멸됩니다. 정말 대기실로 돌아가시겠습니까?
+                </p>
+            </div>
+            <div class="p-4 bg-slate-950 flex space-x-3 justify-end border-t border-slate-850">
+                <button onclick="closeQuitModal()" class="flex-1 bg-slate-900 hover:bg-slate-800 text-slate-400 font-bold py-2.5 rounded-lg text-xs transition border border-slate-800">
+                    계속 진행
+                </button>
+                <button onclick="executeQuit()" class="flex-1 bg-rose-600 hover:bg-rose-500 text-white font-bold py-2.5 rounded-lg text-xs transition">
+                    수사 포기
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- KAKAO APP KEY CONFIG MODAL -->
+    <div id="modal-kakao-config" class="hidden fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-4 backdrop-blur-sm animate-fade-in">
+        <div class="bg-slate-900 border border-slate-800 rounded-2xl w-full max-w-md overflow-hidden shadow-2xl">
+            <div class="p-5 bg-slate-950 border-b border-slate-800 flex justify-between items-center">
+                <h4 class="text-sm font-extrabold text-white flex items-center space-x-2">
+                    <i class="fa-solid fa-comment text-yellow-400"></i>
+                    <span>카카오 공유 JavaScript 앱 키 설정</span>
+                </h4>
+                <button onclick="toggleKakaoSettings()" class="text-slate-400 hover:text-white transition"><i class="fa-solid fa-xmark"></i></button>
+            </div>
+            <div class="p-6 space-y-4">
+                <p class="text-xs text-slate-400 leading-relaxed">
+                    본인의 카카오 개발자 디벨로퍼스(Developers) 콘솔에서 생성한 <b class="text-yellow-400">JavaScript 키</b>를 입력하시면 실제 공식 카카오톡 초대 링크 카드 전송 기능이 동작합니다. 입력하지 않으셔도 똑똑한 클립보드 복사 형태의 도전장이 지원됩니다.
+                </p>
+                <div>
+                    <label class="block text-[11px] font-bold text-slate-400 mb-1.5">JavaScript 앱 키</label>
+                    <input type="text" id="kakao-key-input" class="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-xs text-white focus:outline-none focus:border-indigo-500 font-mono" placeholder="앱 키를 입력하세요">
+                </div>
+            </div>
+            <div class="p-4 bg-slate-950 flex space-x-2 justify-end border-t border-slate-850">
+                <button onclick="toggleKakaoSettings()" class="bg-slate-900 hover:bg-slate-800 text-slate-400 px-4 py-2 rounded-lg text-xs font-bold transition border border-slate-800">
+                    닫기
+                </button>
+                <button onclick="saveKakaoKey()" class="bg-indigo-600 hover:bg-indigo-500 text-white px-5 py-2 rounded-lg text-xs font-bold transition">
+                    키 저장 및 활성화
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- FOOTER -->
+    <footer class="text-center py-4 text-[10px] md:text-xs text-slate-600 border-t border-slate-950 bg-slate-950/80">
+        <p>© 2026 기록 수사대: 레벨업!. All rights reserved. 대한민국 의무기록 적정성 평가 가이드라인에 근거하여 개발되었습니다.</p>
+    </footer>
+
+    <!-- AUDIO & GAME LOGIC -->
+    <script>
+        // Custom Retro Web Audio Synth to play clinical sounding feedback effects
+        const SoundFX = {
+            ctx: null,
+            init() {
+                if (!this.ctx) {
+                    this.ctx = new (window.AudioContext || window.webkitAudioContext)();
+                }
+            },
+            playSuccess() {
+                this.init();
+                const now = this.ctx.currentTime;
+                const osc = this.ctx.createOscillator();
+                const gain = this.ctx.createGain();
+                osc.type = 'triangle';
+                osc.frequency.setValueAtTime(523.25, now); // C5
+                osc.frequency.setValueAtTime(659.25, now + 0.08); // E5
+                osc.frequency.setValueAtTime(783.99, now + 0.16); // G5
+                osc.frequency.setValueAtTime(1046.50, now + 0.24); // C6
+                
+                gain.gain.setValueAtTime(0.08, now);
+                gain.gain.exponentialRampToValueAtTime(0.005, now + 0.4);
+                
+                osc.connect(gain);
+                gain.connect(this.ctx.destination);
+                osc.start(now);
+                osc.stop(now + 0.4);
+            },
+            playError() {
+                this.init();
+                const now = this.ctx.currentTime;
+                const osc = this.ctx.createOscillator();
+                const gain = this.ctx.createGain();
+                osc.type = 'sawtooth';
+                osc.frequency.setValueAtTime(260.00, now);
+                osc.frequency.linearRampToValueAtTime(130.00, now + 0.25);
+                
+                gain.gain.setValueAtTime(0.1, now);
+                gain.gain.exponentialRampToValueAtTime(0.005, now + 0.3);
+                
+                osc.connect(gain);
+                gain.connect(this.ctx.destination);
+                osc.start(now);
+                osc.stop(now + 0.3);
+            },
+            playLevelUp() {
+                this.init();
+                const now = this.ctx.currentTime;
+                const osc = this.ctx.createOscillator();
+                const gain = this.ctx.createGain();
+                osc.type = 'sine';
+                osc.frequency.setValueAtTime(440, now);
+                osc.frequency.exponentialRampToValueAtTime(1320, now + 0.4);
+                
+                gain.gain.setValueAtTime(0.12, now);
+                gain.gain.exponentialRampToValueAtTime(0.005, now + 0.5);
+                
+                osc.connect(gain);
+                gain.connect(this.ctx.destination);
+                osc.start(now);
+                osc.stop(now + 0.5);
+            },
+            playPowerUp() {
+                this.init();
+                const now = this.ctx.currentTime;
+                const osc = this.ctx.createOscillator();
+                const gain = this.ctx.createGain();
+                osc.type = 'square';
+                osc.frequency.setValueAtTime(400, now);
+                osc.frequency.exponentialRampToValueAtTime(1600, now + 0.15);
+                
+                gain.gain.setValueAtTime(0.06, now);
+                gain.gain.exponentialRampToValueAtTime(0.005, now + 0.2);
+                
+                osc.connect(gain);
+                gain.connect(this.ctx.destination);
+                osc.start(now);
+                osc.stop(now + 0.2);
+            }
+        };
+
+        // GAME STATES & CONSTANTS
+        let playerName = "한의사";
+        let playerGender = "f"; // 'f' or 'm'
+        let currentRank = "수습 수사관";
+        let totalScore = 0;
+        let currentStage = 1;
+        let currentMissionIndex = 0;
+        let patientHp = 100;
+        let isItemUsedThisMission = { dictionary: false, timer: false };
+
+        const PATIENT_DATABASE = {
+            1: { name: "강상민 (남/51세)", diagnosis: "외상성 비장 파열 및 혈복강 (Traumatic Splenic Rupture)", icon: "🤕", normalVital: "HR 78 | BT 36.6℃", dangerousVital: "HR 118 | BT 38.5℃" },
+            2: { name: "심숙희 (여/72세)", diagnosis: "대퇴골 경부 골절 수술 후 상태 (Postop Hip Fracture)", icon: "👵", normalVital: "HR 70 | BT 36.5℃", dangerousVital: "HR 98 | BT 37.9℃" },
+            3: { name: "장태선 (남/64세)", diagnosis: "우측 소엽 폐렴 및 급성 기포성 기흉 (Pneumonia with Pneumothorax)", icon: "🤒", normalVital: "HR 80 | BT 36.8℃", dangerousVital: "HR 125 | BT 39.2℃" }
+        };
+
+        const MISSIONS = {
+            1: [ // Stage 1: SOAP 구조와 충실도 수사
+                {
+                    type: "classification",
+                    question: "환자가 극심한 수술 부위 욱신거림을 호소하며 NRS 7점을 호소하고 있습니다. <b class='text-amber-400'>'NRS 통증지수 7점'</b> 정보는 SOAP 중 어디에 수록해야 합니까?",
+                    clinicalText: "“NRS 측정 시 7점 확인되었고 밤새 욱신거려 수면을 취하지 못했다고 진술함.”",
+                    options: [
+                        { text: "<b>주관적 자료 (S - Subjective):</b> 환자가 인지하여 말한 주관적 통증 강도이므로 S에 귀속한다.", isCorrect: true, feedback: "정답입니다! 통증지수(NRS, VAS 등)는 측정 도구를 사용하지만, 본질적으로 환자의 주관적 고통 호소를 수치화한 것이므로 <b>반드시 주관적 자료(S)</b>에 기입해야 합니다." },
+                        { text: "<b>객관적 자료 (O - Objective):</b> 숫자로 명시되는 7점 데이터이므로 물리 측정값으로 보고 O에 귀속한다.", isCorrect: false, feedback: "틀렸습니다. NRS 통증 강도는 제3자가 외부 기기로 직접 측정해 입증할 수 있는 생체 신호가 아닌 환자의 주관적 강도 응답이므로 O가 아니라 S에 배치되어야 적정성 평가에서 통과됩니다." }
+                    ],
+                    itemEffect: "표준 사전 분석: '통증(Pain Score)은 환자가 느끼는 주관적 고통의 표현이므로 S가 원칙입니다.'"
+                },
+                {
+                    type: "completeness",
+                    question: "적정성 감사 도중, 어제 작성된 경과기록지와 오늘 작성된 경과기록지의 내용이 100% 동일한 <b class='text-rose-400'>'복사 및 붙여넣기(Ctrl+C, V)'</b> 관행이 감지되었습니다. 이에 대한 올바른 수사관 처방은?",
+                    clinicalText: "“2026-06-01: V/S stable, wound clean, f/u 예정” -> “2026-06-02: V/S stable, wound clean, f/u 예정 (수정 전혀 없음)”",
+                    options: [
+                        { text: "<b>그대로 둔다:</b> 어차피 환자 상태에 유의미한 극적 변화가 없다면 그대로 복사 유지해도 인정된다.", isCorrect: false, feedback: "오답입니다. 이전 기록과 동일한 내용을 수정이나 추가 관찰 기록 없이 무수정 반복 기재하는 루틴 복사 방식은 불충실 기록으로 분류되어 감점됩니다." },
+                        { text: "<b>환자의 일일 상태 변화를 추적 기재한다:</b> 동일한 치료라 할지라도 당일 신체검진 변동점, 삼출물(drainage) 유무, 처치 반응 등을 차별화하여 실질 기록한다.", isCorrect: true, feedback: "정답입니다! 상태 변화나 조치 내용의 변화가 확인되는 사실을 당일 시점에 맞게 직접 갱신 기록하여 불법적인 루틴 반복 기입을 차단해야 합니다." }
+                    ],
+                    itemEffect: "타이머 분석: '환자 상태 변화가 미세하더라도 당일 환자의 자각 변화, 실제 관찰 사실을 구분하여 기록에 고유성을 부여하십시오.'"
+                },
+                {
+                    type: "metadata",
+                    question: "의무기록 충실도의 최우선 기본은 <b class='text-cyan-400'>정확한 기록 시점 및 환자 식별성</b>입니다. 다음 중 충실도가 완벽히 보장된 머리글 포맷을 선택하십시오.",
+                    clinicalText: "경과기록지 상단 정보 누락 조사",
+                    options: [
+                        { text: "<b>포맷 A:</b> “2026년 06월 01일 14시 35분 / 등록번호 9482103 / 환자 강상민”", isCorrect: true, feedback: "정답입니다! 기록 시점(날짜와 분 단위 시간까지 정확히)과 고유 환자 식별정보(등록번호와 환자 이름)가 구체적으로 연동되어 있으므로 충실도 1등급입니다." },
+                        { text: "<b>포맷 B:</b> “오후에 / 21번 병상 강 씨”", isCorrect: false, feedback: "오답입니다. '오후에' 같은 애매한 표기는 법적 기록으로 효력이 없으며, 병상 번호와 불완전한 이름 표기는 환자 오인 투약 등 큰 사고의 위험이 있어 감점 탈락 사유입니다." }
+                    ],
+                    itemEffect: "표준 사전 분석: '일시(분단위) 및 등록번호 매핑은 적정성 감사 대상 1순위입니다.'"
+                }
+            ],
+            2: [ // Stage 2: 주관적(S) & 객관적(O) 표현의 무결성
+                {
+                    type: "subjective_quality",
+                    question: "환자의 주관적 증상(S)을 기술할 때, 신뢰도를 높이기 위해서는 <b class='text-indigo-400'>최소 2가지 이상의 구성 요소 (발생시점, 위치, 양상, 지속시간)</b>가 구체적으로 기입되어야 합니다. 가장 적합한 S 기술 문장은?",
+                    clinicalText: "의혹의 주관 진술 기록: “배가 아픔”",
+                    options: [
+                        { text: "“환자 아침부터 하복부에 쑤시는 듯한 느낌이 지속되어 불편감을 호소함.”", isCorrect: true, feedback: "정답입니다! 발생시점(아침부터), 위치(하복부), 양상(쑤시는 듯한), 지속성여부(지속되어) 중 3가지 요소가 뚜렷하게 수록되었기에 최상의 평가를 받습니다." },
+                        { text: "“환자 현재 전체적으로 약간의 통증 양상이 감지되는 느낌이 있다고 진술함.”", isCorrect: false, feedback: "오답입니다. 발생시점이나 명확한 고통의 위치, 양상이 모두 빠진 모호한 진술입니다." }
+                    ],
+                    itemEffect: "타이머 분석: '환자가 아프다고 할 때는 언제부터, 어디가, 어떻게, 얼마나 지속되었는지 꼭 캐물어 2개 이상 채우십시오.'"
+                },
+                {
+                    type: "objective_quality",
+                    question: "객관적 자료(O) 영역에서 <b class='text-rose-400'>'경하게, 조금, 약간' 등의 애매한 표현</b> 및 <b class='text-rose-400'>'~것 같음, ~보임' 등의 주관적 해석</b>을 모두 배제한 무결점의 O 기록은 무엇입니까?",
+                    clinicalText: "“수술 상처 부위가 약간 붉어 보이며 감염의 우려가 좀 있어 보임.”",
+                    options: [
+                        { text: "“수술 상처 부위에 2x2cm 크기의 경미한 발적 증세가 확인되어 감염인 듯함.”", isCorrect: false, feedback: "오답입니다. '경미한', '~인 듯함'은 여전히 측정 불가능하고 주관이 개입된 적격 탈락 표기입니다." },
+                        { text: "“Surgical wound 부위 반경 2.5cm의 Erythema(발적) 관찰됨. 삼출물 및 부종 없음.”", isCorrect: true, feedback: "정답입니다! '약간', '~같음' 등의 주관을 모두 거둬내고 실제 반경 치수(2.5cm), 전문 의학 명칭(Erythema), 명확한 유무 판별로만 구성된 합격급 기록입니다." }
+                    ],
+                    itemEffect: "표준 사전 분석: 'O, A, P 영역에서 주관적 표현을 전면 삭제하고 계측된 숫자와 관찰 실존 사실만 남깁니다.'"
+                },
+                {
+                    type: "vital_action",
+                    question: "환자의 활력징후(V/S) 측정 시 고열(BT 38.6℃)의 일탈 소견이 감지되었습니다. <b class='text-cyan-400'>객관적 지표 일탈에 대한 올바른 의사의 평가와 대처 기록</b>은?",
+                    clinicalText: "“BT 38.6℃ 측정됨.” 끝?",
+                    options: [
+                        { text: "“BT 38.6℃ 고열 측정되어 아세트아미노펜 1g IV 처방 및 투여함. 1시간 뒤 체온 f/u 예정이며 감염 평가를 위해 CBC 및 Blood Culture 시행함.”", isCorrect: true, feedback: "정답입니다! 사용자가 제출한 표준 임상 조치 문구와 정확히 일치합니다. 활력징후 이상에 대해 의사의 즉각적인 처방 및 투약, 추가 감염 검사(Blood culture 등) 시행과 정량적 피드백 일정이 완벽히 기술되었습니다." },
+                        { text: "“체온이 비정상적으로 다소 높은 편이므로 간호팀에 주시하도록 미션 전달함.”", isCorrect: false, feedback: "오답입니다. 처방 주체인 의사가 구체적인 오더 명칭이나 정량적 대처 f/u 일정을 명시하지 않고 추상적 지시만 남기는 것은 부실 기록입니다." }
+                    ],
+                    itemEffect: "타이머 분석: '이상 수치가 나오면, 의사가 내린 의학적 조치와 약물의 명칭 및 용량, 사후 모니터링 계획이 일관적으로 남아야 합니다.'"
+                }
+            ],
+            3: [ // Stage 3: 평가(A), 계획(P) & 안전·책임 기록
+                {
+                    type: "safety_tubes",
+                    question: "환자의 주요 배액관(L-tube)이 환자의 협조 불능으로 인해 갑작스럽게 자연 이탈(자연 발거)되는 안전 사건이 발생했습니다. <b class='text-emerald-400'>재삽입 과정에서 소량의 비강 출혈(bleeding)이 발생한 상황을 포함하여 의사의 조치 및 법적 책임을 수호하는 안전 기록 양식</b>은? (※ 의무기록지이므로 의사 보고 구절 제외)",
+                    clinicalText: "의혹의 기록: “L-tube 빠짐.”",
+                    options: [
+                        { text: "“15:00 L-tube 환자 무단 발거 확인됨. L-tube 16Fr 재삽입 중 소량의 비강 출혈(bleeding, 약 5cc) 관찰되어 즉시 압박 지혈 시행 및 국소 처치 완료함. 지혈 확인 후 삽입 유지 상태 점검하였으며, 환자 및 보호자에게 임의 발거 시 점막 손상 및 흡인 위험성에 대해 설명하고 안전 수칙을 교육함.”", isCorrect: true, feedback: "정답입니다! 단순 자연 이탈이 아닌 재삽입 중의 실제 문제(비출혈 약 5cc) 발생 사실과 이에 대응한 지혈 조치, 비강 점막 손상 대처 내역이 세심하게 기재되었으며 환자 교육 내역까지 완비되었습니다." },
+                        { text: "“L-tube 이탈 확인되어 인턴에게 재삽입 전화를 넣었으며 내과 치프에게 알렸음.”", isCorrect: false, feedback: "오답입니다. 원내 동료에 대한 보고/연락 위주로만 기록되어 있고, 본질적인 환자 안전 상태 사정 및 환자/보호자에 대한 안전 예방 설명 행위가 유실되었습니다." }
+                    ],
+                    itemEffect: "표준 사전 분석: '배액관 재삽입 시 나타난 부작용(출혈 등)과 대처 처치 사실, 그리고 환자 측 설명 내용이 법적 안전망이 됩니다.'"
+                },
+                {
+                    type: "discharge_record",
+                    question: "환자가 완쾌되어 오늘 자택으로 퇴원하기로 처방 결정되었습니다. <b class='text-cyan-400'>퇴원일 경과기록지에 필수적으로 누락되지 않고 박혀야 하는 핵심 항목</b>은 무엇입니까?",
+                    clinicalText: "“오늘 환자 퇴원 처방 완료함.”",
+                    options: [
+                        { text: "<b>환자의 소감:</b> 퇴원에 기뻐하는 환자의 긍정적인 정서 반응 및 감사 인사", isCorrect: false, feedback: "오답입니다. 환자의 소감 등은 적격 감사 대상이 아닙니다. 필수적인 의학적 퇴원 유형 분류가 들어가야 합니다." },
+                        { text: "<b>퇴원 형태:</b> 치료 종결 후 호전 상태로 ‘자택 퇴원(Discharge to home)’함을 명확히 명기", isCorrect: true, feedback: "정답입니다! 퇴원 당일 경과기록지에는 반드시 <b>퇴원 형태 (퇴원, 전원, 자의퇴원(DAMA), 사망 등)</b>를 명시하여 최종 추적 마무리를 지어야 적합성 100점을 받습니다." }
+                    ],
+                    itemEffect: "타이머 분석: '환자가 떠날 때는 퇴원 형태 분류(자의퇴원, 전원 등)를 쓰는 칸이 반드시 활성화되어야 합니다.'"
+                },
+                {
+                    type: "medication_change",
+                    question: "복용 중이던 아스피린으로 인해 전신 소양증과 두드러기(이상반응)가 출현하여 약제를 변경하려 합니다. <b class='text-amber-400'>안전 책임 기록 기준에 의거한 의사의 최적 약물 교정 기록</b>은? (※ 금기어 D/C 제거 필수)",
+                    clinicalText: "“피부 발진으로 항혈전제 변경 조치함.”",
+                    options: [
+                        { text: "“Aspirin 투여 후 전신 두드러기 및 소양증(이상반응) 감지되어 Aspirin 투약 즉시 중단함. 대체 약물로 Clopidogrel 75mg 매일 1회 경구 투약으로 처방 변경하고 관련 피부 증상 완화 위해 페니라민 1amp IV 임시 처방함.”", isCorrect: true, feedback: "정답입니다! 금기어인 'D/C' 및 'qd'를 전혀 사용하지 않고 한글 순화 표기('즉시 중단함', '매일 1회')를 채택하였습니다. 중단 대상 약물, 사유, 대체 약물과 정확한 용법이 모두 규정대로 기록되었습니다." },
+                        { text: "“이전 투약제 부작용으로 다른 약으로 전환 오더함.”", isCorrect: false, feedback: "오답입니다. 어떤 약이 부작용을 냈는지, 대체하여 정확히 무슨 약을 몇 밀리그램 처방했인지 알 수 없는 심각한 부실 기록입니다." }
+                    ],
+                    itemEffect: "표준 사전 분석: '약제 부작용, 변경 시 약물 명칭과 명확한 대체 용법, 변경 동기가 수록되어야 의료사고를 막습니다.'"
+                }
+            ]
+        };
+
+        window.onload = function() {
+            // Check challenge parameter on load
+            const urlParams = new URLSearchParams(window.location.search);
+            const challenger = urlParams.get('challenger');
+            const score = urlParams.get('score');
+            const rank = urlParams.get('rank');
+
+            if (challenger && score && rank) {
+                document.getElementById('challenger-banner').classList.remove('hidden');
+                document.getElementById('challenger-name').innerText = decodeURIComponent(challenger);
+                document.getElementById('challenger-score').innerText = score;
+                document.getElementById('challenger-rank').innerText = decodeURIComponent(rank);
+                
+                // Prefill the player input name to suggest they are a rival
+                document.getElementById('player-name-input').value = "도전자 의사";
+            }
+
+            // Init Kakao SDK if key exists
+            const savedKey = localStorage.getItem('kakao_js_key');
+            if (savedKey) {
+                document.getElementById('kakao-key-input').value = savedKey;
+                try {
+                    if (!Kakao.isInitialized()) {
+                        Kakao.init(savedKey);
+                        console.log("Kakao SDK Initialized successfully.");
+                    }
+                } catch (e) {
+                    console.error("Kakao SDK Init Error: ", e);
+                }
+            }
+        };
+
+        function selectAvatar(gender) {
+            playerGender = gender;
+            const btnF = document.getElementById('btn-avatar-f');
+            const btnM = document.getElementById('btn-avatar-m');
+            
+            if (gender === 'f') {
+                btnF.className = "flex items-center space-x-3 bg-slate-950 border-2 border-indigo-500 p-3 rounded-lg hover:bg-slate-900 transition text-left w-full";
+                btnM.className = "flex items-center space-x-3 bg-slate-950 border-2 border-transparent p-3 rounded-lg hover:bg-slate-900 transition text-left text-slate-500 w-full";
+            } else {
+                btnM.className = "flex items-center space-x-3 bg-slate-950 border-2 border-indigo-500 p-3 rounded-lg hover:bg-slate-900 transition text-left w-full";
+                btnF.className = "flex items-center space-x-3 bg-slate-950 border-2 border-transparent p-3 rounded-lg hover:bg-slate-900 transition text-left text-slate-500 w-full";
+            }
+        }
+
+        function showView(viewId) {
+            const views = ['view-intro', 'view-gameplay', 'view-stage-clear', 'view-game-over', 'view-ending'];
+            views.forEach(v => {
+                document.getElementById(v).classList.add('hidden');
+            });
+            document.getElementById(viewId).classList.remove('hidden');
+        }
+
+        function startGame() {
+            playerName = document.getElementById('player-name-input').value.trim() || "한의사";
+            totalScore = 0;
+            currentStage = 1;
+            currentMissionIndex = 0;
+            patientHp = 100;
+            
+            updateRank();
+            document.getElementById('total-score').innerText = totalScore;
+            
+            loadStage(currentStage);
+            showView('view-gameplay');
+            SoundFX.playPowerUp();
+        }
+
+        function updateRank() {
+            if (currentStage === 1) {
+                currentRank = "수습 수사관 🕵️‍♂️";
+            } else if (currentStage === 2) {
+                currentRank = "현장 수사관 🕵️‍♀️";
+            } else if (currentStage === 3) {
+                currentRank = "기록 마스터 👑";
+            }
+            document.getElementById('char-rank-badge').innerText = currentRank;
+        }
+
+        function loadStage(stageNum) {
+            updateRank();
+            currentMissionIndex = 0;
+            isItemUsedThisMission = { dictionary: false, timer: false };
+            resetItemBadges();
+            
+            const pt = PATIENT_DATABASE[stageNum];
+            document.getElementById('patient-name').innerText = pt.name;
+            document.getElementById('patient-diagnosis').innerText = pt.diagnosis;
+            document.getElementById('patient-icon').innerText = pt.icon;
+            document.getElementById('vitals-display').innerText = pt.normalVital;
+            
+            loadMission();
+        }
+
+        function resetItemBadges() {
+            document.getElementById('item-dict-badge').className = "mt-1.5 px-2 py-0.5 bg-indigo-500/20 border border-indigo-500/30 text-[9px] text-indigo-400 rounded-full";
+            document.getElementById('item-dict-badge').innerText = "사용가능";
+            document.getElementById('item-timer-badge').className = "mt-1.5 px-2 py-0.5 bg-indigo-500/20 border border-indigo-500/30 text-[9px] text-indigo-400 rounded-full";
+            document.getElementById('item-timer-badge').innerText = "사용가능";
+        }
+
+        function loadMission() {
+            const feedbackAlert = document.getElementById('feedback-alert');
+            feedbackAlert.classList.add('hidden');
+
+            const currentMissions = MISSIONS[currentStage];
+            const mission = currentMissions[currentMissionIndex];
+
+            // Update Progress indicator
+            document.getElementById('stage-number').innerText = `STAGE 0${currentStage}`;
+            document.getElementById('stage-progress').innerText = `${currentMissionIndex + 1} / ${currentMissions.length}`;
+            
+            let stageTitles = {
+                1: "SOAP 구조와 충실도 수사",
+                2: "주관적(S) & 객관적(O) 표현의 무결성",
+                3: "평가(A), 계획(P) & 안전·책임 기록"
+            };
+            document.getElementById('stage-title').innerText = stageTitles[currentStage];
+
+            const workspace = document.getElementById('mission-workspace');
+            workspace.innerHTML = "";
+
+            // Question Display Block
+            const questionText = document.createElement('p');
+            questionText.className = "text-sm text-slate-300 mb-4 leading-relaxed";
+            questionText.innerHTML = `<span class="inline-block bg-indigo-500/20 text-indigo-300 text-[10px] px-2 py-0.5 rounded font-black mr-2 uppercase tracking-wide">의혹 감지 지문</span>${mission.question}`;
+            workspace.appendChild(questionText);
+
+            // Target Text Block (Faulty medical record)
+            const cardBlock = document.createElement('div');
+            cardBlock.className = "bg-slate-950 border border-slate-850 rounded-xl p-4 mb-5 shadow-inner relative";
+            cardBlock.innerHTML = `
+                <div class="absolute right-3 top-3 bg-red-500/10 text-red-400 px-2 py-0.5 rounded text-[9px] font-mono border border-red-500/20">감사 대상 진료 경과 기록</div>
+                <div class="text-[10px] text-slate-500 mb-2 font-bold"><i class="fa-solid fa-notes-medical mr-1"></i> Hospital Progress Note</div>
+                <p id="target-clinical-text" class="text-xs md:text-sm font-semibold text-slate-300 leading-relaxed font-mono select-none">${mission.clinicalText}</p>
+            `;
+            workspace.appendChild(cardBlock);
+
+            // Options Container
+            const optionsContainer = document.createElement('div');
+            optionsContainer.className = "space-y-3";
+            
+            mission.options.forEach((opt, idx) => {
+                const optButton = document.createElement('button');
+                optButton.onclick = () => selectOption(idx);
+                optButton.id = `opt-btn-${idx}`;
+                optButton.className = "w-full bg-slate-900/40 hover:bg-slate-900 border border-slate-800 hover:border-slate-700 p-3.5 rounded-xl text-left text-xs md:text-sm transition-all flex items-start space-x-3 group active:scale-[0.99]";
+                optButton.innerHTML = `
+                    <span class="flex-shrink-0 w-5 h-5 rounded-md bg-slate-800 border border-slate-700 flex items-center justify-center font-bold text-[10px] text-slate-400 group-hover:bg-indigo-600 group-hover:text-white transition-colors select-none">${idx + 1}</span>
+                    <span class="text-slate-300 font-medium leading-relaxed">${opt.text}</span>
+                `;
+                optionsContainer.appendChild(optButton);
+            });
+
+            workspace.appendChild(optionsContainer);
+            selectedOptionIndex = null;
+        }
+
+        let selectedOptionIndex = null;
+
+        function selectOption(index) {
+            const currentMissions = MISSIONS[currentStage];
+            const mission = currentMissions[currentMissionIndex];
+            
+            selectedOptionIndex = index;
+            
+            // Remove previous selections
+            for (let i = 0; i < mission.options.length; i++) {
+                const btn = document.getElementById(`opt-btn-${i}`);
+                if (btn) {
+                    btn.classList.remove('border-indigo-500/80', 'bg-indigo-500/5');
+                    btn.querySelector('span').classList.remove('bg-indigo-600', 'text-white');
+                    btn.querySelector('span').classList.add('bg-slate-800', 'text-slate-400');
+                }
+            }
+            
+            // Apply select style
+            const activeBtn = document.getElementById(`opt-btn-${index}`);
+            if (activeBtn) {
+                activeBtn.classList.add('border-indigo-500/80', 'bg-indigo-500/5');
+                const badge = activeBtn.querySelector('span');
+                badge.classList.remove('bg-slate-800', 'text-slate-400');
+                badge.classList.add('bg-indigo-600', 'text-white');
+            }
+        }
+
+        function useItem(itemType) {
+            if (isItemUsedThisMission[itemType]) {
+                showFeedback("warning", "이미 본 미션에서 해당 장비를 소진했습니다.");
+                return;
+            }
+
+            const currentMissions = MISSIONS[currentStage];
+            const mission = currentMissions[currentMissionIndex];
+
+            if (itemType === 'dictionary') {
+                isItemUsedThisMission.dictionary = true;
+                const badge = document.getElementById('item-dict-badge');
+                badge.className = "mt-1.5 px-2 py-0.5 bg-slate-800 text-[9px] text-slate-500 rounded-full";
+                badge.innerText = "소진됨";
+                
+                SoundFX.playPowerUp();
+                showFeedback("info", `📕 [표준용어사전 힌트] ${mission.itemEffect}`);
+            } else if (itemType === 'timer') {
+                isItemUsedThisMission.timer = true;
+                const badge = document.getElementById('item-timer-badge');
+                badge.className = "mt-1.5 px-2 py-0.5 bg-slate-800 text-[9px] text-slate-500 rounded-full";
+                badge.innerText = "소진됨";
+                
+                SoundFX.playPowerUp();
+                showFeedback("info", `⏱️ [24h 적시타이머 분석] ${mission.itemEffect}`);
+            }
+        }
+
+        function showFeedback(type, message) {
+            const feedbackAlert = document.getElementById('feedback-alert');
+            const feedbackIcon = document.getElementById('feedback-icon');
+            const feedbackMessage = document.getElementById('feedback-message');
+
+            feedbackAlert.classList.remove('hidden', 'bg-rose-500/10', 'border-rose-500/20', 'text-rose-300', 'bg-indigo-500/10', 'border-indigo-500/20', 'text-indigo-300', 'bg-emerald-500/10', 'border-emerald-500/20', 'text-emerald-300', 'bg-amber-500/10', 'border-amber-500/20', 'text-amber-300');
+
+            if (type === "error") {
+                feedbackAlert.classList.add('bg-rose-500/10', 'border-rose-500/20', 'text-rose-300');
+                feedbackIcon.innerHTML = "❌";
+            } else if (type === "success") {
+                feedbackAlert.classList.add('bg-emerald-500/10', 'border-emerald-500/20', 'text-emerald-300');
+                feedbackIcon.innerHTML = "✅";
+            } else if (type === "warning") {
+                feedbackAlert.classList.add('bg-amber-500/10', 'border-amber-500/20', 'text-amber-300');
+                feedbackIcon.innerHTML = "⚠️";
+            } else {
+                feedbackAlert.classList.add('bg-indigo-500/10', 'border-indigo-500/20', 'text-indigo-300');
+                feedbackIcon.innerHTML = "🔍";
+            }
+
+            feedbackMessage.innerHTML = message;
+            feedbackAlert.classList.remove('hidden');
+        }
+
+        function submitAnswer() {
+            if (selectedOptionIndex === null) {
+                showFeedback("warning", "의혹의 기록에 판정을 내린 후 정답을 제출하십시오. (목록 중 하나 선택)");
+                return;
+            }
+
+            const currentMissions = MISSIONS[currentStage];
+            const mission = currentMissions[currentMissionIndex];
+            const chosenOption = mission.options[selectedOptionIndex];
+
+            if (chosenOption.isCorrect) {
+                // Correct Answer
+                SoundFX.playSuccess();
+                totalScore += 100;
+                document.getElementById('total-score').innerText = totalScore;
+                
+                patientHp = Math.min(100, patientHp + 10);
+                updatePatientHpBar();
+                
+                showFeedback("success", `<b>[수사 판정 정합성 통과]</b><br>${chosenOption.feedback}`);
+                
+                // Switch button to Next
+                document.getElementById('btn-next-mission').setAttribute('onclick', 'nextMission()');
+                document.getElementById('btn-next-mission').innerHTML = `다음 수사 지문 추적 <i class="fa-solid fa-arrow-right"></i>`;
+            } else {
+                // Wrong Answer
+                SoundFX.playError();
+                const workspace = document.getElementById('game-container');
+                workspace.classList.add('shake-effect');
+                setTimeout(() => workspace.classList.remove('shake-effect'), 500);
+
+                patientHp = Math.max(0, patientHp - 25);
+                updatePatientHpBar();
+                
+                showFeedback("error", `<b>[수사 판정 위배! 의료질 저하]</b><br>${chosenOption.feedback}`);
+
+                if (patientHp <= 0) {
+                    setTimeout(() => {
+                        showView('view-game-over');
+                    }, 1200);
+                }
+            }
+        }
+
+        function updatePatientHpBar() {
+            const bar = document.getElementById('patient-hp-bar');
+            const txt = document.getElementById('patient-hp-text');
+            const pt = PATIENT_DATABASE[currentStage];
+            
+            bar.style.width = `${patientHp}%`;
+            txt.innerText = `${patientHp} / 100`;
+
+            if (patientHp > 50) {
+                bar.className = "bg-gradient-to-r from-emerald-500 to-teal-400 h-full transition-all duration-500 rounded-full";
+                txt.className = "font-mono font-bold text-emerald-400";
+                document.getElementById('vitals-display').innerText = pt.normalVital;
+                document.getElementById('ecg-line').setAttribute('stroke', '#10b981');
+                document.getElementById('danger-badge').classList.add('hidden');
+            } else if (patientHp > 20) {
+                bar.className = "bg-gradient-to-r from-amber-500 to-yellow-400 h-full transition-all duration-500 rounded-full";
+                txt.className = "font-mono font-bold text-amber-400";
+                document.getElementById('vitals-display').innerText = pt.dangerousVital;
+                document.getElementById('ecg-line').setAttribute('stroke', '#f59e0b');
+                document.getElementById('danger-badge').classList.remove('hidden');
+            } else {
+                bar.className = "bg-gradient-to-r from-rose-600 to-red-500 h-full transition-all duration-500 rounded-full";
+                txt.className = "font-mono font-bold text-rose-500 pulse-text";
+                document.getElementById('vitals-display').innerText = "ALERT " + pt.dangerousVital;
+                document.getElementById('ecg-line').setAttribute('stroke', '#ef4444');
+                document.getElementById('danger-badge').classList.remove('hidden');
+            }
+        }
+
+        function nextMission() {
+            const currentMissions = MISSIONS[currentStage];
+            currentMissionIndex++;
+
+            if (currentMissionIndex < currentMissions.length) {
+                document.getElementById('btn-next-mission').setAttribute('onclick', 'submitAnswer()');
+                document.getElementById('btn-next-mission').innerHTML = `정리 기록 판정 제출 <i class="fa-solid fa-scale-balanced"></i>`;
+                loadMission();
+            } else {
+                stageClear();
+            }
+        }
+
+        function stageClear() {
+            SoundFX.playLevelUp();
+            
+            document.getElementById('clear-title').innerText = `STAGE 0${currentStage} 수사 완료!`;
+            document.getElementById('clear-score').innerText = `+${currentStage * 150} XP 보너스`;
+            totalScore += (currentStage * 150);
+            document.getElementById('total-score').innerText = totalScore;
+
+            patientHp = 100;
+            updatePatientHpBar();
+
+            if (currentStage === 1) {
+                document.getElementById('clear-rank').innerText = "현장 수사관 🕵️‍♀️ (승격 예정)";
+                document.getElementById('clear-desc').innerText = "축하합니다! S/O 분별 수사를 성공적으로 마쳤습니다. 2단계는 '주관적/객관적 문구 교정 수사'에 돌입합니다.";
+                document.getElementById('btn-next-stage').innerText = "2단계 수사 개시하기 🔍";
+            } else if (currentStage === 2) {
+                document.getElementById('clear-rank').innerText = "기록 마스터 👑 (최종 승격 예정)";
+                document.getElementById('clear-desc').innerText = "완벽합니다! 모호한 형용사 및 추정 서술을 완전히 몰수했습니다. 최종 3단계 '평가(A), 계획(P) 및 안전·책임 기록 수사'로 갑니다.";
+                document.getElementById('btn-next-stage').innerText = "3단계 수사 개시하기 🚨";
+            } else {
+                document.getElementById('clear-rank').innerText = "기록 마스터 👑";
+                document.getElementById('clear-desc').innerText = "전설의 의사 기록 수사관 등극! 모든 지문 분석과 적정성 검증에 무오류 합격을 완료하셨습니다.";
+                document.getElementById('btn-next-stage').setAttribute('onclick', 'goEnding()');
+                document.getElementById('btn-next-stage').innerText = "최종 마스터 칭호 수여식 가기 🎖️";
+            }
+
+            showView('view-stage-clear');
+        }
+
+        function goToNextStage() {
+            currentStage++;
+            document.getElementById('btn-next-mission').setAttribute('onclick', 'submitAnswer()');
+            document.getElementById('btn-next-mission').innerHTML = `정리 기록 판정 제출 <i class="fa-solid fa-scale-balanced"></i>`;
+
+            if (currentStage <= 3) {
+                loadStage(currentStage);
+                showView('view-gameplay');
+            } else {
+                goEnding();
+            }
+        }
+
+        function restartStage() {
+            patientHp = 100;
+            updatePatientHpBar();
+            loadStage(currentStage);
+            
+            document.getElementById('btn-next-mission').setAttribute('onclick', 'submitAnswer()');
+            document.getElementById('btn-next-mission').innerHTML = `정리 기록 판정 제출 <i class="fa-solid fa-scale-balanced"></i>`;
+            
+            showView('view-gameplay');
+            SoundFX.playPowerUp();
+        }
+
+        function returnToMain() {
+            showView('view-intro');
+        }
+
+        function goEnding() {
+            document.getElementById('ending-player-name').innerText = playerName;
+            document.getElementById('ending-score').innerText = totalScore;
+            showView('view-ending');
+        }
+
+        function toggleReference() {
+            const modal = document.getElementById('modal-reference');
+            modal.classList.toggle('hidden');
+        }
+
+        // Modals management
+        function triggerQuitConfirm() {
+            document.getElementById('modal-quit').classList.remove('hidden');
+        }
+
+        function closeQuitModal() {
+            document.getElementById('modal-quit').classList.add('hidden');
+        }
+
+        function executeQuit() {
+            closeQuitModal();
+            returnToMain();
+        }
+
+        function toggleKakaoSettings() {
+            document.getElementById('modal-kakao-config').classList.toggle('hidden');
+        }
+
+        function saveKakaoKey() {
+            const keyVal = document.getElementById('kakao-key-input').value.trim();
+            if (keyVal) {
+                localStorage.setItem('kakao_js_key', keyVal);
+                showToastAlert("🔑 카카오 자바스크립트 앱 키가 기기에 안전하게 저장 및 활성화되었습니다!");
+                toggleKakaoSettings();
+                location.reload();
+            } else {
+                localStorage.removeItem('kakao_js_key');
+                showToastAlert("🗑️ 카카오 앱 키가 비워졌습니다. 이제 기본 텍스트 공유 fallback이 동작합니다.");
+                toggleKakaoSettings();
+            }
+        }
+
+        // Challenge sharing URLs
+        function generateChallengeUrl() {
+            const baseUrl = window.location.origin + window.location.pathname;
+            const paramName = encodeURIComponent(playerName);
+            const paramScore = totalScore;
+            const paramRank = encodeURIComponent("기록 수사 마스터 👑");
+            return `${baseUrl}?challenger=${paramName}&score=${paramScore}&rank=${paramRank}`;
+        }
+
+        function copyChallengeLink() {
+            const link = generateChallengeUrl();
+            const tempInput = document.createElement("textarea");
+            tempInput.value = link;
+            document.body.appendChild(tempInput);
+            tempInput.select();
+            document.execCommand("copy");
+            document.body.removeChild(tempInput);
+
+            showToastAlert("🔗 나만의 소셜 도전 링크가 복사되었습니다! 카카오톡에 붙여넣어 전송하세요.");
+        }
+
+        function shareOnKakaoTalk() {
+            const shareUrl = generateChallengeUrl();
+            const titleMsg = `기록 수사대: 레벨업! (의사 기록 수호 RPG)`;
+            const descMsg = `[${playerName}] 의사님이 의무기록 적정성 평가에서 최종 점수 ${totalScore} XP를 획득하고 [기록 마스터] 계급을 달성했습니다! 당신도 이 까다로운 진료기록 수사 전선에 동참해 점수를 깨 보시겠습니까?`;
+
+            const savedKey = localStorage.getItem('kakao_js_key');
+            
+            if (savedKey && typeof Kakao !== 'undefined' && Kakao.isInitialized()) {
+                Kakao.Share.sendDefault({
+                    objectType: 'feed',
+                    content: {
+                        title: titleMsg,
+                        description: descMsg,
+                        imageUrl: 'https://placehold.co/600x315/1e1b4b/38bdf8?text=Record+Detective+RPG',
+                        link: {
+                            mobileWebUrl: shareUrl,
+                            webUrl: shareUrl,
+                        },
+                    },
+                    buttons: [
+                        {
+                            title: '도전장 받고 플레이하기',
+                            link: {
+                                mobileWebUrl: shareUrl,
+                                webUrl: shareUrl,
+                            },
+                        },
+                    ],
+                });
+            } else {
+                const fallbackText = `🚨 [기록 수사대: 레벨업!] 🚨\n\n${playerName} 의사님이 의무기록 적정성 평가에서 수사력을 발휘하여 환자를 무사히 치유했습니다!\n\n■ 최종 누적 점수: ${totalScore} XP\n■ 달성 칭호: 기록 수사 마스터 👑\n\n과연 당신은 이 까다로운 의무기록 체크리스트 심사를 무오류로 통과하여 최고 점수를 갱신할 수 있을까요? 지금 도전해보세요!\n\n👇 도전장 접수 및 게임 시작하기:\n${shareUrl}`;
+                
+                const tempInput = document.createElement("textarea");
+                tempInput.value = fallbackText;
+                document.body.appendChild(tempInput);
+                tempInput.select();
+                document.execCommand("copy");
+                document.body.removeChild(tempInput);
+
+                showToastAlert("💬 [카카오톡 연동 가이드]\n카카오 앱키가 아직 저장되지 않아, 카카오톡 전송용 전체 초대 메세지와 도전 링크가 함께 클립보드에 자동 복사되었습니다! 바로 카카오톡 대화방에 붙여넣기(Ctrl+V) 하세요!");
+            }
+        }
+
+        // Copy Cheat Sheet
+        function copyCheatSheet() {
+            const textToCopy = document.getElementById('cheat-sheet-content').innerText;
+            const tempInput = document.createElement("textarea");
+            tempInput.value = textToCopy;
+            document.body.appendChild(tempInput);
+            tempInput.select();
+            document.execCommand("copy");
+            document.body.removeChild(tempInput);
+
+            showToastAlert("📋 기록 마스터 비법 요약본이 클립보드에 무사히 인계되었습니다!");
+        }
+
+        // Toast Alert system
+        function showToastAlert(msg) {
+            const alertBox = document.createElement('div');
+            alertBox.className = "fixed bottom-5 right-5 bg-gradient-to-r from-indigo-600 to-violet-600 text-white font-extrabold p-4 rounded-xl shadow-2xl border border-indigo-400 z-50 transition-all transform translate-y-10 opacity-0 duration-300 text-xs max-w-sm whitespace-pre-line";
+            alertBox.innerText = msg;
+            document.body.appendChild(alertBox);
+            
+            setTimeout(() => {
+                alertBox.classList.remove('translate-y-10', 'opacity-0');
+            }, 50);
+
+            setTimeout(() => {
+                alertBox.classList.add('translate-y-10', 'opacity-0');
+                setTimeout(() => {
+                    document.body.removeChild(alertBox);
+                }, 300);
+            }, 5000);
+        }
+
+        // Initialize audio engine on body interaction to satisfy user gesture policy
+        window.addEventListener('click', function() {
+            SoundFX.init();
+        }, { once: true });
+    </script>
+</body>
+</html>
